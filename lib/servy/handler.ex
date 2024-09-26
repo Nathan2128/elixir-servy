@@ -1,6 +1,12 @@
 defmodule Servy.Handler do
-  require Logger
+  @moduledoc """
+  Handles requests to server.
+  """
+  import Servy.Plugs
 
+  @pages_path Path.expand("../../pages", __DIR__)
+
+  @doc "Transforms a request into a response."
   def handle(request) do
     request
     |> parse()
@@ -9,25 +15,6 @@ defmodule Servy.Handler do
     |> route()
     |> track()
     |> format_response()
-  end
-
-  def track(%{status: 404, path: path} = conv) do
-    Logger.warning("Warning: #{path} is on the loose!")
-    conv
-  end
-
-  def track(conv), do: conv
-
-  def rewrite_path(%{path: "/wildlife"} = conv) do
-    %{conv | path: "/wildthings"}
-  end
-
-  def rewrite_path(conv), do: conv
-
-  def log(conv) do
-    Logger.info(conv)
-
-    conv
   end
 
   def parse(request) do
@@ -53,7 +40,7 @@ defmodule Servy.Handler do
   end
 
   def route(%{method: "GET", path: "/about"} = conv) do
-    Path.expand("../../pages", __DIR__)
+    @pages_path
     |> Path.join("about.html")
     |> File.read()
     |> handle_file(conv)
