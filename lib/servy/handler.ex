@@ -3,8 +3,9 @@ defmodule Servy.Handler do
   Handles requests to server.
   """
   import Servy.Plugs
+  alias Servy.Conv
 
-  @pages_path Path.expand("../../pages", __DIR__)
+  @pages_path Path.expand("pages", File.cwd!())
 
   @doc "Transforms a request into a response."
   def handle(request) do
@@ -24,29 +25,29 @@ defmodule Servy.Handler do
       |> List.first()
       |> String.split(" ")
 
-    %{method: method, path: path, resp_body: "", status: nil}
+    %Conv{method: method, path: path}
   end
 
-  def route(%{method: "GET", path: "/wildthings"} = conv) do
+  def route(%Conv{method: "GET", path: "/wildthings"} = conv) do
     %{conv | resp_body: "Bears, Lions, Tigers", status: 200}
   end
 
-  def route(%{method: "GET", path: "/bears"} = conv) do
+  def route(%Conv{method: "GET", path: "/bears"} = conv) do
     %{conv | resp_body: "Teddy, Smokey, Paddington", status: 200}
   end
 
-  def route(%{method: "GET", path: "/bears/" <> id} = conv) do
+  def route(%Conv{method: "GET", path: "/bears/" <> id} = conv) do
     %{conv | resp_body: "Bear #{id}", status: 200}
   end
 
-  def route(%{method: "GET", path: "/about"} = conv) do
+  def route(%Conv{method: "GET", path: "/about"} = conv) do
     @pages_path
     |> Path.join("about.html")
     |> File.read()
     |> handle_file(conv)
   end
 
-  def route(%{method: _method, path: path} = conv) do
+  def route(%Conv{method: _method, path: path} = conv) do
     %{conv | resp_body: "The path #{path} was not found on this server.", status: 404}
   end
 
@@ -62,7 +63,7 @@ defmodule Servy.Handler do
     %{conv | status: 500, resp_body: "File error: #{reason}"}
   end
 
-  def format_response(conv) do
+  def format_response(%Conv{} = conv) do
     """
     HTTP/1.1 #{conv.status} #{status_reason(conv.status)}
     Content-Type: text/html
