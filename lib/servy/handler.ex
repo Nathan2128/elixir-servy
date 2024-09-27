@@ -3,7 +3,9 @@ defmodule Servy.Handler do
   Handles requests to server.
   """
   import Servy.Plugs
+
   alias Servy.Conv
+  alias Servy.BearController
 
   @pages_path Path.expand("pages", File.cwd!())
 
@@ -20,17 +22,30 @@ defmodule Servy.Handler do
 
   def parse(request) do
     [top, params_string] = String.split(request, "\n\n")
-    [request_line | headers] = String.split(top, "\n")
+    [request_line | header_lines] = String.split(top, "\n")
     [method, path, _version] = String.split(request_line, " ")
-    params = parse_params(params_string)
+    headers = parse_headers(header_lines)
+    params = parse_params(headers["Content-Type"], params_string)
 
-    %Conv{method: method, path: path, params: params}
+    IO.inspect(header_lines)
+    %Conv{method: method, path: path, params: params, headers: headers}
   end
 
-  def parse_params(params_string) do
+  def parse_headers(header_lines) do
+    Enum.reduce(header_lines, %{}, fn line, headers ->
+      [key, value] = String.split(line, ": ")
+      Map.put(headers, key, value)
+    end)
+  end
+
+  def parse_params("application/x-www-form-urlencoded", params_string) do
     params_string
     |> String.trim()
     |> URI.decode_query()
+  end
+
+  def parse_params(_content_type, _params_string) do
+    %{}
   end
 
   def route(%Conv{method: "GET", path: "/wildthings"} = conv) do
@@ -38,19 +53,20 @@ defmodule Servy.Handler do
   end
 
   def route(%Conv{method: "GET", path: "/bears"} = conv) do
-    %{conv | resp_body: "Teddy, Smokey, Paddington", status: 200}
+    BearController.index(conv)
   end
 
   def route(%Conv{method: "GET", path: "/bears/" <> id} = conv) do
-    %{conv | resp_body: "Bear #{id}", status: 200}
+    params = Map.put(conv.params, "id", id)
+    BearController.show(conv, params)
   end
 
   def route(%Conv{method: "POST", path: "/bears"} = conv) do
-    %{
-      conv
-      | status: 201,
-        resp_body: "Created a #{conv.params["type"]} bear named #{conv.params["name"]}!"
-    }
+    BearController.create(conv, conv.params)
+  end
+
+  def route(%{method: "DELETE", path: "/bears/" <> _id} = conv) do
+    BearController.delete(conv, conv.params)
   end
 
   def route(%Conv{method: "GET", path: "/about"} = conv) do
