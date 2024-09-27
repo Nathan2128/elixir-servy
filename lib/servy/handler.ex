@@ -19,13 +19,18 @@ defmodule Servy.Handler do
   end
 
   def parse(request) do
-    [method, path, _version] =
-      request
-      |> String.split("\n")
-      |> List.first()
-      |> String.split(" ")
+    [top, params_string] = String.split(request, "\n\n")
+    [request_line | headers] = String.split(top, "\n")
+    [method, path, _version] = String.split(request_line, " ")
+    params = parse_params(params_string)
 
-    %Conv{method: method, path: path}
+    %Conv{method: method, path: path, params: params}
+  end
+
+  def parse_params(params_string) do
+    params_string
+    |> String.trim()
+    |> URI.decode_query()
   end
 
   def route(%Conv{method: "GET", path: "/wildthings"} = conv) do
@@ -40,6 +45,14 @@ defmodule Servy.Handler do
     %{conv | resp_body: "Bear #{id}", status: 200}
   end
 
+  def route(%Conv{method: "POST", path: "/bears"} = conv) do
+    %{
+      conv
+      | status: 201,
+        resp_body: "Created a #{conv.params["type"]} bear named #{conv.params["name"]}!"
+    }
+  end
+
   def route(%Conv{method: "GET", path: "/about"} = conv) do
     @pages_path
     |> Path.join("about.html")
@@ -48,7 +61,11 @@ defmodule Servy.Handler do
   end
 
   def route(%Conv{method: _method, path: path} = conv) do
-    %{conv | resp_body: "The path #{path} was not found on this server.", status: 404}
+    %{
+      conv
+      | resp_body: "The path #{path} was not found on this server.",
+        status: 404
+    }
   end
 
   def handle_file({:ok, content}, conv) do
