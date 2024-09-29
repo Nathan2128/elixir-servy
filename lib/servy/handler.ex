@@ -21,8 +21,8 @@ defmodule Servy.Handler do
   end
 
   def parse(request) do
-    [top, params_string] = String.split(request, "\n\n")
-    [request_line | header_lines] = String.split(top, "\n")
+    [top, params_string] = String.split(request, "\r\n\r\n")
+    [request_line | header_lines] = String.split(top, "\r\n")
     [method, path, _version] = String.split(request_line, " ")
     headers = parse_headers(header_lines)
     params = parse_params(headers["Content-Type"], params_string)
@@ -38,6 +38,17 @@ defmodule Servy.Handler do
     end)
   end
 
+  @doc """
+  Parses the given param string of the form `key1=value1&key2=value2`
+  into a map with corresponding keys and values.
+
+  ## Examples
+      iex> params_string = "name=Baloo&type=Brown"
+      iex> Servy.Parser.parse_params("application/x-www-form-urlencoded", params_string)
+      %{"name" => "Baloo", "type" => "Brown"}
+      iex> Servy.Parser.parse_params("multipart/form-data", params_string)
+      %{}
+  """
   def parse_params("application/x-www-form-urlencoded", params_string) do
     params_string
     |> String.trim()
@@ -50,6 +61,10 @@ defmodule Servy.Handler do
 
   def route(%Conv{method: "GET", path: "/wildthings"} = conv) do
     %{conv | resp_body: "Bears, Lions, Tigers", status: 200}
+  end
+
+  def route(%Conv{method: "GET", path: "/api/bears"} = conv) do
+    Servy.Api.BearController.index(conv)
   end
 
   def route(%Conv{method: "GET", path: "/bears"} = conv) do
@@ -98,10 +113,10 @@ defmodule Servy.Handler do
 
   def format_response(%Conv{} = conv) do
     """
-    HTTP/1.1 #{conv.status} #{status_reason(conv.status)}
-    Content-Type: text/html
-    Content-Length: #{String.length(conv.resp_body)}
-
+    HTTP/1.1 #{conv.status} #{status_reason(conv.status)}\r
+    Content-Type:#{conv.resp_content_type}\r
+    Content-Length: #{String.length(conv.resp_body)}\r
+    \r
     #{conv.resp_body}
     """
   end
